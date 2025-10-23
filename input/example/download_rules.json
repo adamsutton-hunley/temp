@@ -1,0 +1,32 @@
+[
+    {
+        "description": "Specs: Division 01",
+        "type": "division",
+        "values": "01",
+        "pipeline": "cc_pipeline"
+    },
+    {
+        "description": "Specs: Division 06",
+        "type": "division",
+        "values": "06",
+        "pipeline": "cc_pipeline"
+    },
+    {
+        "description": "CC Matched Documents",
+        "type": "matched",
+        "values": "",
+        "pipeline": "cc_pipeline"
+    },
+    {
+        "description": "Plans: Building Elevations",
+        "type": "plan",
+        "values": "Building Elevation##Exterior Elevation",
+        "pipeline": "cc_pipeline"
+    },
+    {
+        "description": "Specs: Division 07",
+        "type": "division",
+        "values": "07",
+        "pipeline": "cc_pipeline"
+    }
+]

@@ -1,0 +1,6 @@
+{
+    "name": "SpecSuccess Enrichment Example Customer",
+    "tag": "example",
+    "enrichment_quota": "1000",
+    "service_enabled": true
+}

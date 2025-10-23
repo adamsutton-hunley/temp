@@ -1,0 +1,75 @@
+{
+    "prod": {
+        "name": "Production Environment",
+        "tag": "prod",
+        "connections": {
+            "cc_web": {
+                "name": "ConstructConnect Web",
+                "type": "constructconnect_web",
+                "username": "{{USERNAME}}",
+                "password": "secret.cc_password",
+                "login_url": "https://login.cmdgroup.com/Account/Login"
+            },
+            "cc_ftp": {
+                "name": "ConstructConnect FTP",
+                "type": "constructconnect_ftp",
+                "host": "sftp.cmdintegration.com",
+                "port": "2220",
+                "username": "{{USERNAME}}",
+                "password": "secret.cc_ftp_password",
+                "folder_path": "/{{USERNAME}}"
+            },
+            "dodge_web": {
+                "name": "Dodge Web",
+                "type": "dodge_web",
+                "username": "{{USERNAME}}",
+                "password": "secret.dodge_password",
+                "login_url": "https://sso.dodgepipeline.com"
+            },
+            "dodge_ftp": {
+                "name": "Dodge FTP",
+                "type": "dodge_ftp",
+                "host": "ftp.dodgepipeline.com",
+                "port": "21",
+                "username": "{{USERNAME}}",
+                "password": "secret.dodge_ftp_password",
+                "folder_path": "/"
+            },            
+            "salesforce": {
+                "name": "Salesforce",
+                "type": "salesforce",
+                "username": "{{USERNAME}}",
+                "password": "secret.sf_password",
+                "client_id": "{{CLIENT ID}}",
+                "client_secret": "secret.sf_client_secret",
+                "org_url": "{{INSTANCE URL}}"
+            }
+        },
+        "pipelines": {
+            "dodge_pipeline": {
+                "name": "Dodge Pipeline",
+                "connections": {
+                    "file_source": "dodge_web",
+                    "record_source": "dodge_ftp",
+                    "target": "salesforce"
+                }
+            },
+            "cc_pipeline": {
+                "name": "ConstructConnect Pipeline",
+                "connections": {
+                    "file_source": "cc_web",
+                    "record_source": "cc_ftp",
+                    "target": "salesforce"
+                }
+            }
+        },
+        "secret": {
+            "cc_password": "{{CC WEB PASSWORD}}",
+            "cc_ftp_password": "{{CC FTP PASSWORD}}",
+            "dodge_password": "{{DODGE WEB PASSWORD}}",
+            "dodge_ftp_password": "{{DODGE FTP PASSWORD}}",
+            "sf_password": "{{SF PASSWORD}}",
+            "sf_client_secret": "{{SF CLIENT SECRET}}"
+        }
+    }
+}
