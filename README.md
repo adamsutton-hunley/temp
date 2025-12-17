@@ -1,6 +1,6 @@
 # Client Configuration Deployment Tool
 
-A Python-based tool for deploying client configurations and download rules to AWS infrastructure. This tool manages client configurations in AWS Systems Manager Parameter Store and download rules in DynamoDB.
+A Python-based tool for deploying client configurations, download rules, and enrichment rules to AWS infrastructure. This tool manages client configurations in AWS Systems Manager Parameter Store, download rules in DynamoDB, and enrichment rules in DynamoDB.
 
 ## Overview
 
@@ -8,6 +8,7 @@ This tool automates the deployment of:
 - Client configurations to AWS SSM Parameter Store
 - Environment-specific configurations and secrets
 - Download rules to DynamoDB tables
+- Enrichment rules to DynamoDB (spec-enrichment-rule)
 - Pipeline-specific rule filtering
 
 ## Features
@@ -15,6 +16,7 @@ This tool automates the deployment of:
 - **Dual Input Options**: Use `--input` for shorthand or `--input-dir` for full paths
 - **Dry-Run Mode**: Test deployments without making changes
 - **Pipeline-Specific Rules**: Download rules are filtered based on pipeline associations
+- **Enrichment Rules**: Load enrichment rule JSON directly into `spec-enrichment-rule`
 - **AWS Integration**: Seamless integration with SSM Parameter Store and DynamoDB
 - **ID Generation**: Automatic generation of unique IDs for clients, environments, pipelines, and connections
 - **Secret Management**: Secure handling of passwords and API keys through AWS SSM
@@ -34,12 +36,14 @@ This tool automates the deployment of:
 ├── scripts/
 │   ├── deploy_master.py           # Main deployment orchestrator
 │   ├── client_config_maker.py     # SSM Parameter Store configuration
-│   └── insert_download_rules.py   # DynamoDB rules insertion
+│   ├── insert_download_rules.py   # DynamoDB download rule insertion
+│   └── insert_enrichment_rules.py # DynamoDB enrichment rule insertion
 ├── input/
 │   ├── example/                   # Example configuration (included)
 │   │   ├── client.json
 │   │   ├── environments.json
-│   │   └── download_rules.json
+│   │   ├── download_rules.json
+│   │   └── enrichment_rules.json
 │   └── [your-client]/            # Your client configs (gitignored)
 ├── .dev/
 │   └── dry_run_output/           # Dry-run outputs (gitignored)
@@ -111,6 +115,16 @@ Defines download rules with pipeline associations:
 
 **Important**: Each rule must include a `pipeline` property that matches a pipeline key from `environments.json`.
 
+### 4. enrichment_rules.json
+
+Provides enrichment rule payloads for the `spec-enrichment-rule` table. The file should contain a JSON array; each item needs:
+- `environment_id` (string or environment key)
+- `version` (number)
+- `rules_json` (string blob stored in DynamoDB)
+- `client_id` (optional in file; falls back to the generated client ID)
+
+Items already formatted with DynamoDB attribute types (e.g., `{"environment_id": {"S": "..."}}`) are accepted. If you use environment keys like `"prod"`, they will be replaced with the generated environment IDs during deployment.
+
 ## Usage
 
 ### Quick Start
@@ -124,6 +138,7 @@ Defines download rules with pipeline associations:
    - `client.json`
    - `environments.json`
    - `download_rules.json`
+   - `enrichment_rules.json`
 
 3. Run a dry-run to verify:
    ```bash
@@ -149,9 +164,11 @@ python scripts/deploy_master.py [OPTIONS]
 
 **Other Options**:
 - `--table-name NAME` - DynamoDB table name (default: `spec-download-rule`)
+- `--enrichment-table-name NAME` - Enrichment DynamoDB table (default: `spec-enrichment-rule`)
 - `--region REGION` - AWS region (default: `us-east-1`)
 - `--dry-run` - Show what would be done without making changes
 - `--skip-rules` - Skip download rules insertion (only create client config)
+- `--skip-enrichment-rules` - Skip enrichment rules insertion
 
 **Examples**:
 
@@ -167,6 +184,9 @@ python scripts/deploy_master.py --input yourclient --region us-west-2
 
 # Skip download rules insertion
 python scripts/deploy_master.py --input yourclient --skip-rules
+
+# Skip enrichment rule insertion
+python scripts/deploy_master.py --input yourclient --skip-enrichment-rules
 ```
 
 ### Individual Scripts
@@ -188,6 +208,16 @@ python scripts/insert_download_rules.py \
   [OPTIONS]
 ```
 
+#### Enrichment Rules Insertion
+
+```bash
+python scripts/insert_enrichment_rules.py \
+  --input-dir input/yourclient \
+  [--table-name spec-enrichment-rule] \
+  [--client-id CLIENT_ID] \
+  [--dry-run]
+```
+
 ## Dry-Run Mode
 
 Dry-run mode generates all configurations without making AWS changes:
@@ -202,6 +232,7 @@ python scripts/deploy_master.py --input yourclient --dry-run
 ├── client_config.json
 ├── environment_prod_config.json
 ├── environment_prod_secrets.json
+├── enrichment_rules.json
 └── rules_[pipeline-id].json
 ```
 
@@ -229,14 +260,9 @@ If you have two pipelines (`cc_pipeline` and `dodge_pipeline`) and 5 rules with 
 
 ### DynamoDB
 
-Records created in the specified table (default: `spec-download-rule`) with:
-- `rule_id` (primary key)
-- `env_id`
-- `client_id`
-- `pipeline_id`
-- `description`
-- `type`
-- `values`
+Records created in DynamoDB:
+- Download rules (default table: `spec-download-rule`) with `rule_id` (PK), `env_id`, `client_id`, `pipeline_id`, `description`, `type`, `values`
+- Enrichment rules (default table: `spec-enrichment-rule`) with `environment_id` (PK), `version` (sort key), `client_id`, `rules_json`
 
 ## ID Generation
 
@@ -300,7 +326,7 @@ mkdir input/newclient
 cp -r input/example/* input/newclient/
 
 # 2. Edit configuration files
-# (Update client.json, environments.json, download_rules.json)
+# (Update client.json, environments.json, download_rules.json, enrichment_rules.json)
 
 # 3. Test with dry-run
 python scripts/deploy_master.py --input newclient --dry-run
@@ -312,6 +338,7 @@ python scripts/deploy_master.py --input newclient
 
 # 6. Verify deployment
 aws ssm get-parameter --name /spec/enrichment/clients/{client-id}/config
+# aws dynamodb get-item --table-name spec-enrichment-rule --key '{"environment_id": {"S": "{env-id}"}, "version": {"N": "1"}}'
 ```
 
 ## License

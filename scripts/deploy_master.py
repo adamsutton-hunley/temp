@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Master Deployment Script
-This script orchestrates the deployment of client configurations and download rules
+This script orchestrates the deployment of client configurations, download rules, and enrichment rules.
 """
 
 import json
@@ -106,8 +106,42 @@ def run_download_rules_insertion(client_result: Dict[str, Any], input_dir: str, 
         print(f"\n✗ Error running download rules insertion: {str(e)}")
         return False
 
+def run_enrichment_rules_insertion(client_result: Dict[str, Any], input_dir: str, table_name: str, region: str, dry_run: bool = False, dry_run_output_dir: Path = None) -> Tuple[bool, Dict[str, Any]]:
+    """Run the enrichment rules insertion script."""
+    print("\n" + "=" * 60)
+    print("STEP 3: Inserting enrichment rules into DynamoDB")
+    print("=" * 60)
+
+    try:
+        sys.path.insert(0, str(Path(__file__).parent))
+        from insert_enrichment_rules import insert_enrichment_rules
+
+        result = insert_enrichment_rules(
+            input_dir=input_dir,
+            table_name=table_name,
+            region=region,
+            dry_run=dry_run,
+            dry_run_output_dir=dry_run_output_dir,
+            environment_id_map=client_result.get("environment_ids"),
+            client_id=client_result.get("client_id")
+        )
+
+        if result["success"]:
+            print(f"✓ Enrichment rules processed successfully")
+            print(f"  Items processed: {result['total_rules']}")
+            print(f"  Successful inserts: {result['successful_inserts']}")
+            if not dry_run and result['failed_inserts'] > 0:
+                print(f"  Failed inserts: {result['failed_inserts']}")
+            return True, result
+        else:
+            print(f"✗ Failed to insert enrichment rules: {result.get('error', 'Unknown error')}")
+            return False, result
+    except Exception as e:
+        print(f"\n✗ Error running enrichment rules insertion: {str(e)}")
+        return False, {"error": str(e)}
+
 def main():
-    parser = argparse.ArgumentParser(description="Deploy client configuration and download rules")
+    parser = argparse.ArgumentParser(description="Deploy client configuration, download rules, and enrichment rules")
 
     # Create mutually exclusive group for input directory options
     input_group = parser.add_mutually_exclusive_group(required=True)
@@ -115,9 +149,11 @@ def main():
     input_group.add_argument("--input", help="Name of subfolder in ./input directory (e.g., 'newcustomer' for ./input/newcustomer)")
 
     parser.add_argument("--table-name", default="spec-download-rule", help="DynamoDB table name (default: spec-download-rule)")
+    parser.add_argument("--enrichment-table-name", default="spec-enrichment-rule", help="DynamoDB table name for enrichment rules (default: spec-enrichment-rule)")
     parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be done without actually doing it")
     parser.add_argument("--skip-rules", action="store_true", help="Skip download rules insertion (only create client config)")
+    parser.add_argument("--skip-enrichment-rules", action="store_true", help="Skip enrichment rules insertion")
 
     args = parser.parse_args()
 
@@ -133,6 +169,7 @@ def main():
     print("🚀 Starting Master Deployment Script")
     print(f"Input Directory: {input_dir}")
     print(f"DynamoDB Table: {args.table_name}")
+    print(f"Enrichment Rule Table: {args.enrichment_table_name}")
     print(f"Region: {args.region}")
 
     # Create timestamped dry-run output directory if in dry-run mode
@@ -189,6 +226,28 @@ def main():
             print("⚠️  Download rules insertion completed with some failures")
     else:
         print("\n⏭️  Skipping download rules insertion (--skip-rules specified)")
+
+    # Step 3: Insert enrichment rules (unless skipped)
+    enrichment_result = None
+    if not args.skip_enrichment_rules:
+        enrichment_file = input_dir / "enrichment_rules.json"
+        if not enrichment_file.exists():
+            print(f"❌ Error: Enrichment rules file '{enrichment_file}' does not exist")
+            sys.exit(1)
+
+        enrichment_success, enrichment_result = run_enrichment_rules_insertion(
+            client_result=client_result,
+            input_dir=str(input_dir),
+            table_name=args.enrichment_table_name,
+            region=args.region,
+            dry_run=args.dry_run,
+            dry_run_output_dir=dry_run_output_dir
+        )
+
+        if not enrichment_success:
+            print("⚠️  Enrichment rules insertion completed with some failures")
+    else:
+        print("\n⏭️  Skipping enrichment rules insertion (--skip-enrichment-rules specified)")
     
     # Final summary
     print("\n" + "=" * 60)
@@ -207,11 +266,16 @@ def main():
     if not args.skip_rules:
         total_pipelines = sum(len(pipes) for pipes in client_result['pipeline_ids'].values())
         print(f"Total pipelines with rules: {total_pipelines}")
+    
+    if not args.skip_enrichment_rules and enrichment_result is not None:
+        print(f"Enrichment rule items processed: {enrichment_result['total_rules']}")
 
     if args.dry_run:
         print("\n📁 DRY RUN OUTPUT FILES:")
         print(f"All generated configurations saved to: {dry_run_output_dir}")
         print("Review these files before running without --dry-run")
+        if enrichment_result and enrichment_result.get("total_rules"):
+            print("Enrichment rules saved for review in dry run output")
 
     end_msg = "\n✅ Dry run completed!" if args.dry_run else "\n✅ Deployment completed!"
     print(end_msg)
