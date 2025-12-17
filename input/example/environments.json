@@ -52,7 +52,8 @@
                     "file_source": "dodge_web",
                     "record_source": "dodge_ftp",
                     "target": "salesforce"
-                }
+                },
+                "batch_limit": 5
             },
             "cc_pipeline": {
                 "name": "ConstructConnect Pipeline",
@@ -60,7 +61,8 @@
                     "file_source": "cc_web",
                     "record_source": "cc_ftp",
                     "target": "salesforce"
-                }
+                },
+                "batch_limit": 5
             }
         },
         "secret": {
