@@ -184,7 +184,7 @@ def insert_download_rules(env_id: str, client_id: str, pipeline_id: str, input_d
         if dry_run and dry_run_items and dry_run_output_dir:
             # Create a safe filename from the pipeline_id
             safe_pipeline_id = pipeline_id.replace('/', '_').replace('\\', '_')
-            rules_output_file = dry_run_output_dir / f"rules_{safe_pipeline_id}.json"
+            rules_output_file = dry_run_output_dir / f"download_rules_{safe_pipeline_id}.json"
             with open(rules_output_file, 'w') as f:
                 json.dump(dry_run_items, f, indent=2)
             print(f"Dry-run rules saved to: {rules_output_file}\n")
